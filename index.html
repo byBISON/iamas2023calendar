@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='utf-8' />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<link href='./src/packages/core/main.css' rel='stylesheet' />
+<link href='./src/packages-premium/timeline/main.css' rel='stylesheet' />
+<link href='./src/packages-premium/resource-timeline/main.css' rel='stylesheet' />
+<link href="https://use.fontawesome.com/releases/v5.6.1/css/all.css" rel="stylesheet">
+<title>IAMAS2023スケジュール</title>
+<script src='./src/packages/core/main.js'></script>
+<script src='./src/packages/interaction/main.js'></script>
+<script src='./src/packages-premium/timeline/main.js'></script>
+<script src='./src/packages-premium/resource-common/main.js'></script>
+<script src='./src/packages-premium/resource-timeline/main.js'></script>
+<script src="https://code.jquery.com/jquery-3.3.1.min.js"
+        integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+        crossorigin="anonymous"></script>
+<script src='https://unpkg.com/popper.js/dist/umd/popper.min.js'></script>
+<script src='https://unpkg.com/tooltip.js/dist/umd/tooltip.min.js'></script>
+<script>
+
+
+  var startDate = new Date(2023, 9-1, 1);
+  var today = new Date();
+  var scrollDate = new Date(today.getFullYear(), today.getMonth(), today.getDate()-3);
+  var termDay = (scrollDate-startDate) / 86400000;
+
+  const endpoint = "https://script.google.com/macros/s/AKfycbwUV7l9lB23qfpBTLsGOJx67f4OfmgShPR-7biHHWS48WEfwPkmlwYpfKPsSEPfizy0/exec";
+
+  function callAppsScript(functionName, parameters, callbackFunc) {
+    var request = { 'function': functionName, 'parameters': parameters };
+    $.ajax({
+      type:"get",
+      url: endpoint,
+      data: request,
+      dataType: "jsonp",
+      success: function(data) {
+        callbackFunc(data);
+      }
+    }).fail(function(jqXHR, textStatus, errorThrown ) {
+      console.log("XMLHttpRequest : " + jqXHR.status + "\ntextStatus     : " + textStatus + "\nerrorThrown    : " + errorThrown.message);
+    });
+  }
+
+  const calColors = {
+    'entire': '#000000',
+    'operation': '#E60012',
+    'design': '#0086D1',
+    'construction': '#22AC38',
+    'event': '#F39800',
+    'pr': '#E4007F',
+    'video': '#FFF100'
+  };
+
+  function tooltipInnerHTML(title,duration,user,info,id){
+    var result = "<div>";
+    result = result+"<div class='tooltip-title'><i class='fas fa-square' style='color: "+calColors[id]+"'></i> "+title+"</div>";
+    result = result+"<div class='tooltip-duration'><i class='far fa-clock'></i> "+duration+"</div>";
+    if(user!="") result = result+"<div class='tooltip-user'><i class='fas fa-user'></i> "+user+"</div>";
+    if(info!="") result = result+"<div class='tooltip-info'>"+info+"</div>";
+    result = result+"</div>";
+    var dom = jQuery($.parseHTML(result)[0]);
+    dom.find(".tooltip-info a").each(function(index) {
+      $(this).attr("target", "_blank");
+      $(this).attr("rel", "noopener noreferrer");
+    });
+    result = dom.html();
+    return result;
+  }
+
+  function createCalendar(){
+    $("#loader-wrap").show();
+    callAppsScript("exampleFancA", "", function(data) {
+      var calendarEl = document.getElementById('calendar');
+      var calendar = new FullCalendar.Calendar(calendarEl, {
+        plugins: [ 'interaction', 'resourceTimeline' ],
+        schedulerLicenseKey: 'GPL-My-Project-Is-Open-Source',
+        locale: 'ja',
+        editable: false,
+        contentHeight: 'auto',
+        scrollTime: {
+          days: termDay
+        },
+        businessHours: {
+          // days of week. an array of zero-based day of week integers (0=Sunday)
+          daysOfWeek: [1,2,3,4,5],
+          startTime: '00:00', // a start time (10am in this example)
+          endTime: '24:00', // an end time (6pm in this example)
+        },
+        header: {
+          left: '',
+          center: '',
+          right: ''
+        },
+        defaultView: 'resourceTimelineIAMAS2023',
+        views: {
+          resourceTimelineIAMAS2023: {
+            type: 'resourceTimeline',
+            visibleRange: {
+              start: '2022-09-01',
+              end: '2023-04-01'
+            }
+          }
+        },
+        slotWidth: 45,
+        eventRender: function(info) {
+          var tooltip = new Tooltip(info.el, {
+            html: true,
+            title: tooltipInnerHTML(
+              info.event.extendedProps.tooltipTitle,
+              info.event.extendedProps.tooltipDuration,
+              info.event.extendedProps.tooltipUser,
+              info.event.extendedProps.tooltipInfo,
+              info.event.extendedProps.tooltipId,
+            ),
+            placement: 'top',
+            trigger: 'hover',
+            container: 'body'
+          });
+        },
+        resourceAreaWidth: '80px',
+        resourceLabelText: 'カレンダー',
+        resources: [
+          { id: 'entire', title: '全体', eventColor: calColors['entire'] },
+          { id: 'operation', title: '運営', eventColor: calColors['operation'] },
+          { id: 'design', title: 'デザイン', eventColor: calColors['design'] },
+          { id: 'event', title: 'イベント', eventColor: calColors['event'] },
+          { id: 'video', title: 'アーカイブ', eventColor: calColors['video'] },
+          { id: 'construction', title: '設営', eventColor: calColors['construction'] },
+          { id: 'pr', title: '広報', eventColor: calColors['pr'] }
+        ],
+        eventClick: function(info) {
+          info.jsEvent.preventDefault();
+          window.open(info.event.url, '_blank');
+        },
+        selectable: true,
+        select: function(info) {
+          var url = "https://calendar.google.com/calendar/r/eventedit?dates="+info.startStr.replace(/-/g,"")+"/"+info.endStr.replace(/-/g,"");
+          window.open(url, '_blank');
+        },
+        events: data
+      });
+
+      $(".fc-toolbar").each(function(){
+        $(this).remove();
+      });
+      $(".fc-view-container").each(function(){
+        $(this).remove();
+      });
+      $(".tooltip").each(function(){
+        $(this).remove();
+      });
+
+      $("#load-group").hide();
+      $("#reload-group").hide();
+      $("#success-group").show();
+
+      $("#loader-wrap").delay(800).fadeOut(300,function(){
+        $("#load-group").hide();
+        $("#reload-group").show();
+        $("#success-group").hide();
+      });
+
+      calendar.render();
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    createCalendar();
+  });
+
+</script>
+<style>
+
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, Helvetica Neue, Helvetica, sans-serif;
+    font-size: 14px;
+  }
+
+  #head-title {
+    margin: 10px auto 0px;
+    text-align: center;
+    font-size: 2rem;
+    font-weight: bolder;
+  }
+
+  #head-link {
+    margin: 0px auto 0px;
+    text-align: center;
+    font-size: 1rem;
+    font-weight: bolder;
+  }
+
+  @media only screen and (max-width: 750px) {
+    #head-title {font-size: 1.5rem;}
+  }
+
+  #calendar {
+    width: 90%;
+    margin: 0px auto 50px;
+  }
+
+  #loader-wrap{
+    z-index: 10000;
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  #loader-card{
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    margin: auto;
+    width: 200px;
+    height: 200px;
+    background-color: rgba(255,255,255,0.85);
+    border-radius: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    border: 1px solid #dddddd;
+  }
+
+  #load-group{
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  #load-group .loader{
+    background: url("./src/img/loader.gif") center center no-repeat;
+    background-size: 40px 40px;
+  }
+
+  #load-group .loader-text{
+  }
+
+  #reload-group{
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: none;
+    width: 100%;
+    height: 100%;
+  }
+
+  #reload-group .loader{
+    background: url("./src/img/loader.gif") center center no-repeat;
+    background-size: 40px 40px;
+  }
+
+  #reload-group .loader-text{
+  }
+
+  #success-group{
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: none;
+    width: 100%;
+    height: 100%;
+  }
+
+  #success-group .loader{
+    background: url("./src/img/success.png") center center no-repeat;
+    background-size: 40px 40px;
+  }
+
+  #success-group .loader-text{
+  }
+
+  .fade{
+    animation: fadeOut 0.3s ease 0.2s 1 normal;
+  }
+  @keyframes fadeOut {
+    0% {opacity: 1}
+    100% {opacity: 0}
+  }
+
+  .loader{
+    position: absolute;
+    bottom: 50px;
+    left: 50px;
+    width: 100px;
+    height: 50px;
+    text-align: center;
+  }
+
+  .loader-text{
+    position: absolute;
+    top: 40px;
+    left: 50px;
+    width: 100px;
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: bold;
+  }
+
+  .fc-today {
+    background: #FCFFB6 !important;
+  }
+
+  .fc-bgevent {
+    background: #dddddd !important;
+  }
+
+  .fc-timeline-event .fc-title{/*--ver 3.9.0 word wrap------*/
+    //white-space: normal;
+    //word-wrap: break-word;
+    font-size: 0.7rem;
+  }
+
+  .fc-widget-header{
+    font-size: 0.5rem;
+  }
+
+  .fc-body .fc-resource-area .fc-cell-content{
+    height: 70px;
+    font-size: 1rem;
+  }
+
+  .tooltip-inner{
+
+  }
+
+  .tooltip-title{
+    font-size: 1rem;
+    font-weight: bolder;
+    margin: 0 auto 12px;
+  }
+
+  .tooltip-inner a {
+    word-wrap:break-word;
+  }
+
+  .tooltip-duration{
+    font-size: 0.8rem;
+  }
+
+  .tooltip-user{
+    font-size: 0.8rem;
+  }
+
+  .tooltip-info{
+    font-size: 0.8rem;
+    margin: 12px auto 0;
+  }
+
+  .popper,
+  .tooltip {
+    position: absolute;
+    z-index: 9999;
+    background: #FFFFFF;
+    color: black;
+    width: 300px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    padding: 13px 15px;
+    border: 1px solid #dddddd;
+    /* pointer-events: none; */
+  }
+  .style5 .tooltip {
+    background: #1E252B;
+    color: #FFFFFF;
+    max-width: 300px;
+    width: auto;
+    font-size: .8rem;
+    padding: .5em 1em;
+  }
+  .popper .popper__arrow,
+  .tooltip .tooltip-arrow {
+    position: absolute;
+  }
+
+  .tooltip .tooltip-arrow,
+  .popper .popper__arrow {
+    border-color: #333333;
+  }
+  .style5 .tooltip .tooltip-arrow {
+    border-color: #1E252B;
+  }
+  .popper[x-placement^="top"],
+  .tooltip[x-placement^="top"] {
+    margin-bottom: 15px;
+  }
+  .popper[x-placement^="top"]::before,
+  .tooltip[x-placement^="top"]::before {
+    content: "";
+    position: absolute;
+    width: 300px;
+    height: 25px;
+    bottom: -20px;
+    left: calc(50% - 150px);
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+  .popper[x-placement^="top"] .popper__arrow,
+  .tooltip[x-placement^="top"] .tooltip-arrow {
+    width: 0;
+    height: 0;
+    border-style: solid;
+    position: absolute;
+    border-width: 5px 5px 0 5px;
+    border-left-color: transparent;
+    border-right-color: transparent;
+    border-bottom-color: transparent;
+    bottom: -10px;
+    left: calc(50% - 5px);
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+  .popper[x-placement^="bottom"],
+  .tooltip[x-placement^="bottom"] {
+    margin-top: 15px;
+  }
+  .popper[x-placement^="bottom"]::before,
+  .tooltip[x-placement^="bottom"]::before {
+    content: "";
+    position: absolute;
+    width: 300px;
+    height: 25px;
+    top: -20px;
+    left: calc(50% - 150px);
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+  .popper[x-placement^="bottom"] .popper__arrow,
+  .tooltip[x-placement^="bottom"] .tooltip-arrow {
+    content: "";
+    width: 0;
+    height: 0;
+    border-style: solid;
+    position: absolute;
+    border-width: 0px 5px 5px 5px;
+    border-left-color: transparent;
+    border-right-color: transparent;
+    border-top-color: transparent;
+    top: -10px;
+    left: calc(50% - 5px);
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+</style>
+</head>
+<body>
+  <div id="head-title">IAMAS2023 スケジュール</div>
+  <div id='head-link'><a href="https://bybison.github.io/iamas2022calendar" target="_blank">去年のスケジュールはこちら</a></div>
+  <div id='calendar'></div>
+  <div id='loader-wrap'>
+    <div id='loader-card'>
+      <div id='load-group'>
+        <div class='loader-text'>取得中</div>
+        <div class='loader'></div>
+      </div>
+      <div id='reload-group'>
+        <div class='loader-text'>自動更新中</div>
+        <div class='loader'></div>
+      </div>
+      <div id='success-group'>
+        <div class='loader-text'>完了</div>
+        <div class='loader'></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
